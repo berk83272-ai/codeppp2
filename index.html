@@ -15,8 +15,12 @@
 
     <style>
         :root {
-            --primary: #00d4ff; --admin: #00ff41; --danger: #ff003c;
-            --bg: #020202; --panel: #0a0a0c; --border: #1f1f23;
+            --primary: #00d4ff;
+            --admin: #00ff41;
+            --danger: #ff003c;
+            --bg: #020202;
+            --panel: #0a0a0c;
+            --border: #1f1f23;
             --text: #e0e0e0;
         }
 
@@ -39,7 +43,6 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 13px;
             z-index: 100;
         }
 
@@ -58,7 +61,6 @@
             font-size: 11px;
             border-radius: 4px;
             cursor: pointer;
-            transition: 0.2s;
         }
 
         .btn:hover { border-color: var(--primary); color: var(--primary); }
@@ -164,7 +166,7 @@
             color: #555;
         }
 
-        /* Overlord Panel - Mobile Friendly */
+        /* Overlord */
         #overlord-panel {
             position: fixed;
             inset: 0;
@@ -200,7 +202,6 @@
             border-radius: 8px;
             text-align: center;
             cursor: pointer;
-            transition: 0.2s;
         }
 
         .ov-card:hover { border-color: var(--admin); background: rgba(0,255,65,0.08); }
@@ -216,6 +217,15 @@
             color: var(--danger);
             cursor: pointer;
         }
+
+        /* Neon efektleri */
+        @keyframes neon-flicker {
+            0%,19%,21%,23%,25%,54%,56%,100% { text-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
+            20%,24%,55% { text-shadow: none; }
+        }
+
+        .neon-turquoise { color: var(--primary); text-shadow: 0 0 6px var(--primary), 0 0 12px var(--primary); animation: neon-flicker 4s infinite; }
+        .neon-red { color: var(--danger); text-shadow: 0 0 8px var(--danger), 0 0 16px var(--danger); animation: neon-flicker 3s infinite; font-weight: bold; }
 
         /* Gate */
         #gate {
@@ -238,7 +248,6 @@
             border-radius: 8px;
         }
 
-        /* Hide explorer on mobile */
         .explorer { display: none; }
 
         @media (min-width: 768px) {
@@ -275,7 +284,6 @@
 
 <main>
     <aside class="explorer">
-        <!-- Dosya listesi masaüstünde görünür, mobilde gizli -->
         <div style="font-size:10px; color:#444; margin-bottom:12px;">FILES</div>
         <div class="file-item active" onclick="SystemKernel.loadFile('main.py', this)"><i class="fab fa-python"></i> main.py</div>
         <div class="file-item" onclick="SystemKernel.loadFile('config.json', this)"><i class="fas fa-cog"></i> config.json</div>
@@ -301,7 +309,6 @@
     </aside>
 </main>
 
-<!-- Overlord Panel -->
 <div id="overlord-panel">
     <div class="ov-header">OVERLORD CORE <span class="ov-close" onclick="UI.toggleOverlord(false)">×</span></div>
     <div class="ov-grid">
@@ -395,10 +402,13 @@ const SystemKernel = {
 };
 
 const Overlord = {
-    ghostMessage() { alert("[GHOST] Bu fonksiyon Firebase ile entegre edilebilir."); },
+    ghostMessage() { alert("[GHOST] Firebase ile entegre edilebilir."); },
     systemAlert() { alert("Global alert gönderildi! (simüle)"); },
-    triggerGlitch() { document.body.style.animation = "glitch 1s"; setTimeout(()=>document.body.style.animation="",1000); },
-    purgeDB() { if(confirm("Chat temizlensin mi?")) db.ref("v48_chat").remove(); }
+    triggerGlitch() { 
+        document.body.classList.add("glitch-active"); 
+        setTimeout(()=>document.body.classList.remove("glitch-active"), 2000); 
+    },
+    purgeDB() { if(confirm("Tüm chat silinsin mi?")) db.ref("v48_chat").remove(); }
 };
 
 const UI = {
@@ -406,11 +416,29 @@ const UI = {
     toggleOverlord(show) { document.getElementById("overlord-panel").style.display = show ? "flex" : "none"; }
 };
 
+// Glitch anim
+const style = document.createElement('style');
+style.innerHTML = `
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-3px, 3px); }
+      40% { transform: translate(3px, -3px); }
+      60% { transform: translate(-3px, 0); }
+      100% { transform: translate(0); }
+    }
+    .glitch-active { animation: glitch 0.4s infinite; }
+`;
+document.head.appendChild(style);
+
 // Chat
 document.getElementById("chat-input").onkeypress = e => {
     if(e.key === "Enter" && e.target.value.trim()) {
+        const usernameToSend = SystemKernel.isRoot 
+            ? SystemKernel.user + " [ROOT]" 
+            : SystemKernel.user;
+
         db.ref("v48_chat").push({
-            u: SystemKernel.user + (SystemKernel.isRoot ? " [ROOT]" : ""),
+            u: usernameToSend,
             m: e.target.value,
             t: Date.now()
         });
@@ -421,24 +449,27 @@ document.getElementById("chat-input").onkeypress = e => {
 db.ref("v48_chat").limitToLast(50).on("value", snap => {
     const box = document.getElementById("global-chat");
     box.innerHTML = "";
+
     snap.forEach(d => {
         const v = d.val();
-        box.innerHTML += `<div><b style="color:\( {v.u.includes('[ROOT]') ? 'var(--admin)' : 'var(--primary)'}"> \){v.u}:</b> ${v.m}</div>`;
+        const isOwner = v.u.includes("@rw_f00t") || v.u.includes("[ROOT]");
+
+        const nameClass = isOwner ? "neon-red" : "neon-turquoise";
+        let displayName = v.u.replace(" [ROOT]", "");
+
+        if (isOwner) {
+            displayName += ' <span class="neon-red">[OWNER]</span>';
+        }
+
+        box.innerHTML += `
+            <div style="margin: 8px 0; line-height:1.4; word-break:break-word;">
+                <b class="\( {nameClass}"> \){displayName}:</b> 
+                <span style="color:#e0e0e0;">${v.m}</span>
+            </div>`;
     });
+
     box.scrollTop = box.scrollHeight;
 });
-
-// Basit glitch animasyonu için (opsiyonel)
-const style = document.createElement('style');
-style.innerHTML = `
-@keyframes glitch {
-  0% { transform: translate(0); }
-  20% { transform: translate(-4px, 4px); }
-  40% { transform: translate(4px, -4px); }
-  60% { transform: translate(-4px, 0); }
-  100% { transform: translate(0); }
-}`;
-document.head.appendChild(style);
 </script>
 </body>
-        </html>
+</html>
